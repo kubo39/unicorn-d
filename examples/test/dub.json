@@ -1,0 +1,9 @@
+{
+	"name": "test",
+	"authors": [
+		"kubo39"
+	],
+    "dependencies": {
+        "unicorn": {"path": "../../"}
+    }
+}

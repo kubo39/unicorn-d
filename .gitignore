@@ -1,0 +1,14 @@
+.dub
+docs.json
+__dummy.html
+docs/
+unicorn-d.so
+unicorn-d.dylib
+unicorn-d.dll
+unicorn-d.a
+unicorn-d.lib
+unicorn-d-test-*
+*.exe
+*.[oa]
+*.obj
+*.lst

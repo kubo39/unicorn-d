@@ -1,0 +1,9 @@
+{
+	"name": "unicorn",
+	"authors": [
+		"kubo39"
+	],
+    "libs": ["unicorn"],
+	"targetType": "library",
+	"license": "MIT"
+}
