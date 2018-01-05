@@ -5,5 +5,5 @@
 	],
     "libs": ["unicorn"],
 	"targetType": "library",
-	"license": "MIT"
+	"license": "GPL-2.0"
 }
