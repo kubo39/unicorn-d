@@ -93,12 +93,6 @@ enum HookType
     MEM_FETCH = 1 << 12, // Hook memory fetch for execution events
 }
 
-enum CodeHookType
-{
-    CODE = 1 << 2, // Hook a range of code
-    BLOCK = 1 << 3, // Hook basic blocks
-}
-
 enum MemHookType
 {
     MEM_READ_UNMAPPED = 1 << 4, // Hook for memory read on unmapped memory
