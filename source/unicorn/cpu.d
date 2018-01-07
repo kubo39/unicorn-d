@@ -263,6 +263,12 @@ template CpuImpl(Arch arch)
         return this.emu.query(query);
     }
 
+    uc_hook addCodeHook(HookType hookType, ulong begin, ulong end,
+                        void function(Unicorn*, ulong, uint) callback)
+    {
+        return this.emu.addCodeHook(hookType, begin, end, callback);
+    }
+
     uc_hook addIntrHook(void function(Unicorn*, uint) callback)
     {
         return this.emu.addIntrHook(callback);
