@@ -34,7 +34,7 @@ struct UnicornHook(F)
 
 alias CodeHook = UnicornHook!(void function(Unicorn*, ulong, uint));
 alias IntrHook = UnicornHook!(void function(Unicorn*, uint));
-alias MemHook = UnicornHook!(bool function(Unicorn*, MemType, ulong, size_t, ulong));
+alias MemHook = UnicornHook!(bool function(Unicorn*, MemType, ulong, size_t, long));
 alias InsnInHook = UnicornHook!(uint function(Unicorn*, uint, size_t));
 alias InsnOutHook = UnicornHook!(void function(Unicorn*, uint, size_t, uint));
 alias InsnSysHook = UnicornHook!(void function(Unicorn*));
@@ -47,6 +47,12 @@ extern (C) void code_hook_proxy(uc_handle _, ulong address, uint size, CodeHook*
 extern (C) void intr_hook_proxy(uc_handle _, uint intno, IntrHook* user_data)
 {
     (*user_data.callback)(user_data.unicorn, intno);
+}
+
+extern (C) bool mem_hook_proxy(uc_handle _, MemType memType, ulong address, size_t size,
+                               long value, MemHook* user_data)
+{
+    return (*user_data.callback)(user_data.unicorn, memType, address, size, value);
 }
 
 struct Unicorn
@@ -172,6 +178,18 @@ struct Unicorn
         return hook;
     }
 
+    uc_hook addMemHook(HookType hookType, ulong begin, ulong end,
+                       bool function(Unicorn*, MemType, ulong, size_t, long) callback)
+    {
+        uc_hook hook;
+        auto user_data = new MemHook(&this, callback);
+        auto status = uc_hook_add(this.engine, &hook, hookType, cast(size_t)&mem_hook_proxy,
+                                  cast(size_t*)user_data, begin, end);
+        if (status != Status.OK)
+            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        return hook;
+    }
+
     void removeHook(uc_hook hook)
     {
         auto status = uc_hook_del(this.engine, hook);
@@ -189,23 +207,6 @@ struct Unicorn
     }
 }
 
-unittest
-{
-    auto callback = function(Unicorn* unicorn, uint intno)
-    {
-        assert(intno == 0x80);
-    };
-
-    ubyte[] instructions = [0xcd, 0x80]; // INT 0x80;
-
-    auto emu = CpuX86(Mode.MODE_32);
-    emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
-    emu.memWrite(0x1000UL, instructions);
-
-    auto hook = emu.addIntrHook(callback);
-    emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
-    emu.removeHook(hook);
-}
 
 template CpuImpl(Arch arch)
 {
@@ -282,6 +283,12 @@ template CpuImpl(Arch arch)
         return this.emu.addIntrHook(callback);
     }
 
+    uc_hook addMemHook(HookType hookType, ulong begin, ulong end,
+                       bool function(Unicorn*, MemType, ulong, size_t, long) callback)
+    {
+        return this.emu.addMemHook(hookType, begin, end, callback);
+    }
+
     void removeHook(uc_hook hook)
     {
         this.emu.removeHook(hook);
@@ -296,4 +303,55 @@ struct CpuARM
 struct CpuX86
 {
     mixin CpuImpl!(Arch.X86);
+}
+
+
+unittest
+{
+    // intr callback
+    {
+        auto callback = function(Unicorn* unicorn, uint intno)
+            {
+                assert(intno == 0x80);
+            };
+
+        ubyte[] instructions = [0xcd, 0x80]; // INT 0x80;
+
+        auto emu = CpuX86(Mode.MODE_32);
+        emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
+        emu.memWrite(0x1000UL, instructions);
+
+        auto hook = emu.addIntrHook(callback);
+        emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
+        emu.removeHook(hook);
+    }
+
+    // mem callback
+    {
+        import unicorn.x86constants;
+
+        auto callback = function(Unicorn* unicorn, MemType memType, ulong address,
+                                 size_t size, long value)
+            {
+                assert(memType == MemType.WRITE);
+                assert(address == 0x2000);
+                assert(size == 4);
+                assert(value == 0xdeadbeef);
+                return false;
+            };
+
+        // mov eax, 0xdeadbeef;
+        // mov [0x2000], eax;
+        ubyte[] instructions = [0xB8, 0xEF, 0xBE, 0xAD, 0xDE, 0xA3, 0x00, 0x20, 0x00, 0x00];
+
+        auto emu = CpuX86(Mode.MODE_32);
+        emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
+        emu.memWrite(0x1000UL, instructions);
+
+        auto hook = emu.addMemHook(cast(HookType)MemHookType.MEM_ALL, 0UL, ulong.max,
+                                   callback);
+        emu.regWrite(RegisterX86.EAX, 0x123);
+        emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 0x1000);
+        emu.removeHook(hook);
+    }
 }
