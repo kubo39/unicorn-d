@@ -39,7 +39,7 @@ alias InsnInHook = UnicornHook!(uint function(Unicorn*, uint, size_t));
 alias InsnOutHook = UnicornHook!(void function(Unicorn*, uint, size_t, uint));
 alias InsnSysHook = UnicornHook!(void function(Unicorn*));
 
-extern (C) void code_hook_proxy(uc_handle _, uint address, uint size, CodeHook* user_data)
+extern (C) void code_hook_proxy(uc_handle _, ulong address, uint size, CodeHook* user_data)
 {
     (*user_data.callback)(user_data.unicorn, address, size);
 }
