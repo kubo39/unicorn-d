@@ -351,6 +351,26 @@ struct CpuARM
     mixin CpuImpl!(Arch.ARM);
 }
 
+struct CpuARM64
+{
+    mixin CpuImpl!(Arch.ARM64);
+}
+
+struct CpuM68K
+{
+    mixin CpuImpl!(Arch.M68K);
+}
+
+struct CpuMIPS
+{
+    mixin CpuImpl!(Arch.MIPS);
+}
+
+struct CpuSPARC
+{
+    mixin CpuImpl!(Arch.SPARC);
+}
+
 struct CpuX86
 {
     mixin CpuImpl!(Arch.X86);
