@@ -14,6 +14,7 @@ class UnicornError : Exception
     mixin basicExceptionCtors;
 }
 
+// Return combined API version & major and minor version numbers.
 auto unicornVersion() nothrow @nogc
 {
     uint major = 0;
@@ -22,6 +23,7 @@ auto unicornVersion() nothrow @nogc
     return tuple(major, minor);
 }
 
+// Determine if the given architecture is supported by this library.
 bool archSupported(Arch arch) nothrow @nogc
 {
     return uc_arch_supported(arch);
@@ -72,10 +74,15 @@ extern (C) void insn_sys_hook_proxy(uc_handle _, InsnSysHook* user_data)
     (*user_data.callback)(user_data.unicorn);
 }
 
+
+/**
+   Unicorn emulator engine.
+ */
 struct Unicorn
 {
     uc_handle engine;
 
+    // Create new instance of unicorn engine.
     this(Arch arch, Mode mode)
     {
         auto status = uc_open(arch, mode, &engine);
@@ -88,12 +95,14 @@ struct Unicorn
         uc_close(engine);
     }
 
+    // Write to register.
     void regWrite(int regid, ulong value)
     {
         auto status = uc_reg_write(this.engine, regid, cast(const void*)&value);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    // Read register value.
     ulong regRead(int regid)
     {
         ulong value;
@@ -102,24 +111,28 @@ struct Unicorn
         return value;
     }
 
+    // Map memory in for emulation.
     void memMap(ulong address, size_t size, uint perms)
     {
         auto status = uc_mem_map(this.engine, address, size, perms);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    //  Unmap a region of emulation memory.
     void memUnmap(ulong address, size_t size)
     {
         auto status = uc_mem_unmap(this.engine, address, size);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    //  Write to a range of bytes in memory.
     void memWrite(ulong address, const ubyte[] bytes)
     {
         auto status = uc_mem_write(this.engine, address, bytes.ptr, bytes.length);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    // Read a range of bytes in memory.
     ubyte[] memRead(ulong address, size_t size)
     {
         auto bytes = new ubyte[size];
@@ -128,12 +141,14 @@ struct Unicorn
         return bytes;
     }
 
+    // Set memory permissions for emulation memory.
     void memProtect(ulong address, size_t size, uint perms)
     {
         auto status = uc_mem_protect(this.engine, address, size, perms);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    // Retrieve all memory regions mapped by Unicorn.memMap.
     MemRegion[] memRegions()
     {
         import core.stdc.stdlib : free;
@@ -150,18 +165,21 @@ struct Unicorn
         return regions;
     }
 
+    // Emulate machine code in a specific duration of time.
     void emuStart(ulong begin, ulong until, ulong timeout, size_t count)
     {
         auto status = uc_emu_start(this.engine, begin, until, timeout, count);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    // Stop emulation.
     void emuStop()
     {
         auto status = uc_emu_stop(this.engine);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    // Register callback for a code hook event.
     uc_hook addCodeHook(HookType hookType, ulong begin, ulong end,
                         void function(Unicorn*, ulong, uint) callback)
     {
@@ -173,6 +191,7 @@ struct Unicorn
         return hook;
     }
 
+    // Register callback for a intr hook event.
     uc_hook addIntrHook(void function(Unicorn*, uint) callback)
     {
         uc_hook hook;
@@ -183,6 +202,7 @@ struct Unicorn
         return hook;
     }
 
+    // Register callback for a intr mem event.
     uc_hook addMemHook(HookType hookType, ulong begin, ulong end,
                        bool function(Unicorn*, MemType, ulong, size_t, long) callback)
     {
@@ -194,6 +214,7 @@ struct Unicorn
         return hook;
     }
 
+    // Register callback for a insn in hook event.
     uc_hook addInsnInHook(uint function(Unicorn*, uint, size_t) callback)
     {
         uc_hook hook;
@@ -204,6 +225,7 @@ struct Unicorn
         return hook;
     }
 
+    // Register callback for a insn out hook event.
     uc_hook addInsnOutHook(void function(Unicorn*, uint, size_t, uint) callback)
     {
         uc_hook hook;
@@ -214,6 +236,7 @@ struct Unicorn
         return hook;
     }
 
+    // Register callback for a insn sys hook event.
     uc_hook addInsnSysHook(InsnX86 insnType, ulong begin, ulong end,
                            void function(Unicorn*) callback)
     {
@@ -225,12 +248,14 @@ struct Unicorn
         return hook;
     }
 
+    // Remove a hook callback.
     void removeHook(uc_hook hook)
     {
         auto status = uc_hook_del(this.engine, hook);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    // Query internal status of engine.
     size_t query(Query query)
     {
         size_t ret = 0;
