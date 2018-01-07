@@ -26,6 +26,8 @@ Status uc_mem_map(uc_handle engine, ulong address, size_t size,
 Status uc_mem_unmap(uc_handle engine, ulong address, size_t size);
 Status uc_mem_protect(uc_handle engine, ulong address, size_t size,
                       uint perms);
+Status uc_mem_regions(uc_handle engine, const MemRegion** regions,
+                      uint* count);
 Status uc_emu_start(uc_handle engine, ulong begin, ulong until,
                     ulong timeout, size_t count);
 Status uc_emu_stop(uc_handle engine);

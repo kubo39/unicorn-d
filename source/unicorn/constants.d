@@ -47,6 +47,22 @@ enum Status
     HOOK_EXIST, // hook for this event already existed
 }
 
+enum Protection : uint
+{
+    PROT_NONE = 0,
+    PROT_READ = 1,
+    PROT_WRITE = 2,
+    PROT_EXEC = 4,
+    PROT_ALL = 7,
+}
+
+extern(C) struct MemRegion
+{
+    ulong begin;
+    ulong end;
+    Protection perms;
+}
+
 enum MemType
 {
     READ = 16, // Memory is read from

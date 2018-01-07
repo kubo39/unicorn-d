@@ -58,7 +58,7 @@ struct Unicorn
         return value;
     }
 
-    void memMap(ulong address, size_t size, int perms)
+    void memMap(ulong address, size_t size, uint perms)
     {
         auto status = uc_mem_map(this.engine, address, size, perms);
         if (status != Status.OK)
@@ -93,6 +93,23 @@ struct Unicorn
         auto status = uc_mem_protect(this.engine, address, size, perms);
         if (status != Status.OK)
             throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+    }
+
+    MemRegion[] memRegions()
+    {
+        import core.stdc.stdlib : free;
+        uint nbRegions = 0;
+        const MemRegion* regionsPtr;
+        auto status = uc_mem_regions(this.engine, &regionsPtr, &nbRegions);
+        if (status != Status.OK)
+            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        MemRegion[] regions;
+        foreach (size_t i; 0 .. nbRegions)
+        {
+            regions ~= cast(MemRegion) *(regionsPtr[i .. i+MemRegion.sizeof]).ptr;
+        }
+        free(cast(void*) regionsPtr);
+        return regions;
     }
 
     void emuStart(ulong begin, ulong until, ulong timeout, size_t count)
@@ -138,7 +155,7 @@ template CpuImpl(Arch arch)
         return this.emu.regRead(regid);
     }
 
-    void memMap(ulong address, size_t size, int perms)
+    void memMap(ulong address, size_t size, uint perms)
     {
         this.emu.memMap(address, size, perms);
     }
@@ -156,6 +173,11 @@ template CpuImpl(Arch arch)
     ubyte[] memRead(ulong address, size_t size)
     {
         return this.emu.memRead(address, size);
+    }
+
+    MemRegion[] memRegions()
+    {
+        return this.emu.memRegions();
     }
 
     void emuStart(ulong begin, ulong until, ulong timeout, size_t count)
