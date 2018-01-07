@@ -175,6 +175,11 @@ template CpuImpl(Arch arch)
         return this.emu.memRead(address, size);
     }
 
+    void memProtect(ulong address, size_t size, uint perms)
+    {
+        return this.emu.memProtect(address, size, perms);
+    }
+
     MemRegion[] memRegions()
     {
         return this.emu.memRegions();
