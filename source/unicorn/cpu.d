@@ -7,6 +7,7 @@ import std.typecons : tuple;
 
 import unicorn.constants;
 import unicorn.ffi;
+import unicorn.x86constants;
 
 class UnicornError : Exception
 {
@@ -53,6 +54,22 @@ extern (C) bool mem_hook_proxy(uc_handle _, MemType memType, ulong address, size
                                long value, MemHook* user_data)
 {
     return (*user_data.callback)(user_data.unicorn, memType, address, size, value);
+}
+
+extern (C) uint insn_in_hook_proxy(uc_handle _, uint port, size_t size, InsnInHook* user_data)
+{
+    return (*user_data.callback)(user_data.unicorn, port, size);
+}
+
+extern (C) void insn_out_hook_proxy(uc_handle _, uint port, size_t size, uint value,
+                                    InsnOutHook* user_data)
+{
+    (*user_data.callback)(user_data.unicorn, port, size, value);
+}
+
+extern (C) void insn_sys_hook_proxy(uc_handle _, InsnSysHook* user_data)
+{
+    (*user_data.callback)(user_data.unicorn);
 }
 
 struct Unicorn
@@ -190,6 +207,40 @@ struct Unicorn
         return hook;
     }
 
+    uc_hook addInsnInHook(uint function(Unicorn*, uint, size_t) callback)
+    {
+        uc_hook hook;
+        auto user_data = new InsnInHook(&this, callback);
+        auto status = uc_hook_add(this.engine, &hook, HookType.INSN, cast(size_t)&insn_in_hook_proxy,
+                                  cast(size_t*)user_data, 0, 0, InsnX86.IN);
+        if (status != Status.OK)
+            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        return hook;
+    }
+
+    uc_hook addInsnOutHook(void function(Unicorn*, uint, size_t, uint) callback)
+    {
+        uc_hook hook;
+        auto user_data = new InsnOutHook(&this, callback);
+        auto status = uc_hook_add(this.engine, &hook, HookType.INSN, cast(size_t)&insn_out_hook_proxy,
+                                  cast(size_t*)user_data, 0, 0, InsnX86.OUT);
+        if (status != Status.OK)
+            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        return hook;
+    }
+
+    uc_hook addInsnSysHook(InsnX86 insnType, ulong begin, ulong end,
+                           void function(Unicorn*) callback)
+    {
+        uc_hook hook;
+        auto user_data = new InsnSysHook(&this, callback);
+        auto status = uc_hook_add(this.engine, &hook, HookType.INSN, cast(size_t)&insn_sys_hook_proxy,
+                                  cast(size_t*)user_data, begin, end, insnType);
+        if (status != Status.OK)
+            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        return hook;
+    }
+
     void removeHook(uc_hook hook)
     {
         auto status = uc_hook_del(this.engine, hook);
@@ -303,6 +354,21 @@ struct CpuARM
 struct CpuX86
 {
     mixin CpuImpl!(Arch.X86);
+
+    uc_hook addInsnInHook(uint function(Unicorn*, uint, size_t) callback)
+    {
+        return this.emu.addInsnInHook(callback);
+    }
+
+    uc_hook addInsnOutHook(void function(Unicorn*, uint, size_t, uint) callback)
+    {
+        return this.emu.addInsnOutHook(callback);
+    }
+
+    uc_hook addInsnSysHook(InsnX86 insnType, ulong begin, ulong end, void function(Unicorn*) callback)
+    {
+        return this.emu.addInsnSysHook(insnType, begin, end, callback);
+    }
 }
 
 
@@ -347,8 +413,6 @@ unittest
 
     // mem callback
     {
-        import unicorn.x86constants;
-
         auto callback = function(Unicorn* unicorn, MemType memType, ulong address,
                                  size_t size, long value)
             {
@@ -371,6 +435,67 @@ unittest
                                    callback);
         emu.regWrite(RegisterX86.EAX, 0x123);
         emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 0x1000);
+        emu.removeHook(hook);
+    }
+
+    // insn in callback
+    {
+        auto callback = function(Unicorn* unicorn, uint port, size_t size)
+            {
+                assert(port == 0x10);
+                assert(size == 4);
+                return 0U;
+            };
+
+        ubyte[] instructions = [0xe5, 0x10]; // IN eax, 0x10;
+
+        auto emu = CpuX86(Mode.MODE_32);
+        emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
+        emu.memWrite(0x1000UL, instructions);
+
+        auto hook = emu.addInsnInHook(callback);
+        emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
+        emu.removeHook(hook);
+    }
+
+    // insn out callback
+    {
+        auto callback = function(Unicorn* unicorn, uint port, size_t size, uint value)
+            {
+                assert(port == 0x46);
+                assert(size == 1);
+                assert(value == 0x32);
+            };
+
+        ubyte[] instructions = [0xb0, 0x32, 0xe6, 0x46]; // MOV al, 0x32; OUT  0x46, al;
+
+        auto emu = CpuX86(Mode.MODE_32);
+        emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
+        emu.memWrite(0x1000UL, instructions);
+
+        auto hook = emu.addInsnOutHook(callback);
+        emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
+        emu.removeHook(hook);
+    }
+
+    // insn sys callback
+    {
+        auto callback = function(Unicorn* unicorn)
+            {
+                auto rax = unicorn.regRead(RegisterX86.RAX);
+                assert(rax == 0xdeadbeef);
+            };
+
+        // MOV rax, 0xdeadbeef; SYSCALL;
+        ubyte[] instructions = [0x48, 0xB8, 0xEF, 0xBE, 0xAD, 0xDE, 0x00, 0x00, 0x00, 0x00, 0x0F,
+                                0x05];
+
+        auto emu = CpuX86(Mode.MODE_64);
+        emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
+        emu.memWrite(0x1000UL, instructions);
+
+        auto hook = emu.addInsnSysHook(InsnX86.SYSCALL, 1, 0, callback);
+        emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
         emu.removeHook(hook);
     }
 }
