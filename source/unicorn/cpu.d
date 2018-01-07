@@ -308,6 +308,25 @@ struct CpuX86
 
 unittest
 {
+    // code callback
+    {
+        auto callback = function(Unicorn* unicorn, ulong address, uint size)
+            {
+                assert(address == 0x1000);
+                assert(size == 1);
+            };
+
+        ubyte[] instructions = [0x41]; // INC ecx;
+
+        auto emu = CpuX86(Mode.MODE_32);
+        emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
+        emu.memWrite(0x1000, instructions);
+
+        auto hook = emu.addCodeHook(HookType.CODE, 0x1000, 0x2000, callback);
+        emu.emuStart(0x1000, 0x1001, 10 * SECOND_SCALE, 1000);
+        emu.removeHook(hook);
+    }
+
     // intr callback
     {
         auto callback = function(Unicorn* unicorn, uint intno)
