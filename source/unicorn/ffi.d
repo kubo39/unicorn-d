@@ -31,4 +31,8 @@ Status uc_mem_regions(uc_handle engine, const MemRegion** regions,
 Status uc_emu_start(uc_handle engine, ulong begin, ulong until,
                     ulong timeout, size_t count);
 Status uc_emu_stop(uc_handle engine);
+Status uc_hook_add(uc_handle engine, uc_hook* hook, HookType type,
+                   size_t callback, size_t* user_data,
+                   ulong begin, ulong end, ...);
+Status uc_hook_del(uc_handle engine, uc_hook hook);
 Status uc_query(uc_handle engine, Query query_type, size_t* result);
