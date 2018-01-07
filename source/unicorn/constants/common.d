@@ -1,4 +1,4 @@
-module unicorn.constants;
+module unicorn.constants.common;
 
 immutable ulong SECOND_SCALE = 1000000;
 immutable ulong MILISECOND_SCALE = 1000;

@@ -1,6 +1,6 @@
 module unicorn.ffi;
 
-import unicorn.constants;
+import unicorn.constants.common;
 
 extern (C):
 nothrow:

@@ -5,9 +5,9 @@ import std.format;
 import std.string : fromStringz;
 import std.typecons : tuple;
 
-import unicorn.constants;
+import unicorn.constants.common;
+import unicorn.constants.x86;
 import unicorn.ffi;
-import unicorn.x86constants;
 
 class UnicornError : Exception
 {

@@ -1,4 +1,4 @@
-module unicorn.x86constants;
+module unicorn.constants.x86;
 
 enum RegisterX86
 {
