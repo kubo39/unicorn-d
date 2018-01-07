@@ -91,54 +91,47 @@ struct Unicorn
     void regWrite(int regid, ulong value)
     {
         auto status = uc_reg_write(this.engine, regid, cast(const void*)&value);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
     ulong regRead(int regid)
     {
         ulong value;
         auto status = uc_reg_read(this.engine, regid, cast(void*)&value);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return value;
     }
 
     void memMap(ulong address, size_t size, uint perms)
     {
         auto status = uc_mem_map(this.engine, address, size, perms);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
     void memUnmap(ulong address, size_t size)
     {
         auto status = uc_mem_unmap(this.engine, address, size);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
     void memWrite(ulong address, const ubyte[] bytes)
     {
         auto status = uc_mem_write(this.engine, address, bytes.ptr, bytes.length);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
     ubyte[] memRead(ulong address, size_t size)
     {
         auto bytes = new ubyte[size];
         auto status = uc_mem_read(this.engine, address, bytes.ptr, size);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return bytes;
     }
 
     void memProtect(ulong address, size_t size, uint perms)
     {
         auto status = uc_mem_protect(this.engine, address, size, perms);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
     MemRegion[] memRegions()
@@ -147,8 +140,7 @@ struct Unicorn
         uint nbRegions = 0;
         const MemRegion* regionsPtr;
         auto status = uc_mem_regions(this.engine, &regionsPtr, &nbRegions);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         MemRegion[] regions;
         foreach (size_t i; 0 .. nbRegions)
         {
@@ -161,15 +153,13 @@ struct Unicorn
     void emuStart(ulong begin, ulong until, ulong timeout, size_t count)
     {
         auto status = uc_emu_start(this.engine, begin, until, timeout, count);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
     void emuStop()
     {
         auto status = uc_emu_stop(this.engine);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
     uc_hook addCodeHook(HookType hookType, ulong begin, ulong end,
@@ -179,8 +169,7 @@ struct Unicorn
         auto user_data = new CodeHook(&this, callback);
         auto status = uc_hook_add(this.engine, &hook, hookType, cast(size_t)&code_hook_proxy,
                                   cast(size_t*)user_data, begin, end);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return hook;
     }
 
@@ -190,8 +179,7 @@ struct Unicorn
         auto user_data = new IntrHook(&this, callback);
         auto status = uc_hook_add(this.engine, &hook, HookType.INTR, cast(size_t)&intr_hook_proxy,
                                   cast(size_t*)user_data, 0, 0);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return hook;
     }
 
@@ -202,8 +190,7 @@ struct Unicorn
         auto user_data = new MemHook(&this, callback);
         auto status = uc_hook_add(this.engine, &hook, hookType, cast(size_t)&mem_hook_proxy,
                                   cast(size_t*)user_data, begin, end);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return hook;
     }
 
@@ -213,8 +200,7 @@ struct Unicorn
         auto user_data = new InsnInHook(&this, callback);
         auto status = uc_hook_add(this.engine, &hook, HookType.INSN, cast(size_t)&insn_in_hook_proxy,
                                   cast(size_t*)user_data, 0, 0, InsnX86.IN);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return hook;
     }
 
@@ -224,8 +210,7 @@ struct Unicorn
         auto user_data = new InsnOutHook(&this, callback);
         auto status = uc_hook_add(this.engine, &hook, HookType.INSN, cast(size_t)&insn_out_hook_proxy,
                                   cast(size_t*)user_data, 0, 0, InsnX86.OUT);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return hook;
     }
 
@@ -236,24 +221,21 @@ struct Unicorn
         auto user_data = new InsnSysHook(&this, callback);
         auto status = uc_hook_add(this.engine, &hook, HookType.INSN, cast(size_t)&insn_sys_hook_proxy,
                                   cast(size_t*)user_data, begin, end, insnType);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return hook;
     }
 
     void removeHook(uc_hook hook)
     {
         auto status = uc_hook_del(this.engine, hook);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
     }
 
     size_t query(Query query)
     {
         size_t ret = 0;
         auto status = uc_query(this.engine, query, &ret);
-        if (status != Status.OK)
-            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
         return ret;
     }
 }
