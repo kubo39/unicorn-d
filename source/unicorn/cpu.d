@@ -204,6 +204,7 @@ unittest
 
     auto hook = emu.addIntrHook(callback);
     emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
+    emu.removeHook(hook);
 }
 
 template CpuImpl(Arch arch)
