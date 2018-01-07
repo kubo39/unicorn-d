@@ -172,6 +172,13 @@ struct Unicorn
         return hook;
     }
 
+    void removeHook(uc_hook hook)
+    {
+        auto status = uc_hook_del(this.engine, hook);
+        if (status != Status.OK)
+            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+    }
+
     size_t query(Query query)
     {
         size_t ret = 0;
@@ -272,6 +279,11 @@ template CpuImpl(Arch arch)
     uc_hook addIntrHook(void function(Unicorn*, uint) callback)
     {
         return this.emu.addIntrHook(callback);
+    }
+
+    void removeHook(uc_hook hook)
+    {
+        this.emu.removeHook(hook);
     }
 }
 
