@@ -1,5 +1,8 @@
 module unicorn.constants;
 
+immutable ulong SECOND_SCALE = 1000000;
+immutable ulong MILISECOND_SCALE = 1000;
+
 enum Arch
 {
     ARM = 1,

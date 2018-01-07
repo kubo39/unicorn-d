@@ -26,6 +26,29 @@ bool archSupported(Arch arch) nothrow @nogc
     return uc_arch_supported(arch);
 }
 
+struct UnicornHook(F)
+{
+    Unicorn* unicorn;
+    F callback;
+}
+
+alias CodeHook = UnicornHook!(void function(Unicorn*, ulong, uint));
+alias IntrHook = UnicornHook!(void function(Unicorn*, uint));
+alias MemHook = UnicornHook!(bool function(Unicorn*, MemType, ulong, size_t, ulong));
+alias InsnInHook = UnicornHook!(uint function(Unicorn*, uint, size_t));
+alias InsnOutHook = UnicornHook!(void function(Unicorn*, uint, size_t, uint));
+alias InsnSysHook = UnicornHook!(void function(Unicorn*));
+
+extern (C) void code_hook_proxy(uc_handle _, uint address, uint size, CodeHook* user_data)
+{
+    (*user_data.callback)(user_data.unicorn, address, size);
+}
+
+extern (C) void intr_hook_proxy(uc_handle _, uint intno, IntrHook* user_data)
+{
+    (*user_data.callback)(user_data.unicorn, intno);
+}
+
 struct Unicorn
 {
     uc_handle engine;
@@ -126,6 +149,29 @@ struct Unicorn
             throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
     }
 
+    uc_hook addCodeHook(HookType hookType, ulong begin, ulong end,
+                        void function(Unicorn*, ulong, uint) callback)
+    {
+        uc_hook hook;
+        auto user_data = new CodeHook(&this, callback);
+        auto status = uc_hook_add(this.engine, &hook, hookType, cast(size_t)&code_hook_proxy,
+                                  cast(size_t*)user_data, begin, end);
+        if (status != Status.OK)
+            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        return hook;
+    }
+
+    uc_hook addIntrHook(void function(Unicorn*, uint) callback)
+    {
+        uc_hook hook;
+        auto user_data = new IntrHook(&this, callback);
+        auto status = uc_hook_add(this.engine, &hook, HookType.INTR, cast(size_t)&intr_hook_proxy,
+                                  cast(size_t*)user_data, 0, 0);
+        if (status != Status.OK)
+            throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
+        return hook;
+    }
+
     size_t query(Query query)
     {
         size_t ret = 0;
@@ -134,6 +180,23 @@ struct Unicorn
             throw new UnicornError(format("Error: %s", uc_strerror(status).fromStringz));
         return ret;
     }
+}
+
+unittest
+{
+    auto callback = function(Unicorn* unicorn, uint intno)
+    {
+        assert(intno == 0x80);
+    };
+
+    ubyte[] instructions = [0xcd, 0x80]; // INT 0x80;
+
+    auto emu = CpuX86(Mode.MODE_32);
+    emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
+    emu.memWrite(0x1000UL, instructions);
+
+    auto hook = emu.addIntrHook(callback);
+    emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
 }
 
 template CpuImpl(Arch arch)
@@ -198,6 +261,11 @@ template CpuImpl(Arch arch)
     size_t query(Query query)
     {
         return this.emu.query(query);
+    }
+
+    uc_hook addIntrHook(void function(Unicorn*, uint) callback)
+    {
+        return this.emu.addIntrHook(callback);
     }
 }
 

@@ -12,3 +12,4 @@ unicorn-d-test-*
 *.[oa]
 *.obj
 *.lst
+unicorn-test-library
