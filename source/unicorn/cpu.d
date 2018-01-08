@@ -409,53 +409,38 @@ unittest
 {
     // code callback
     {
-        auto callback = function(Unicorn* unicorn, ulong address, uint size)
-            {
-                assert(address == 0x1000);
-                assert(size == 1);
-            };
-
         ubyte[] instructions = [0x41]; // INC ecx;
 
         auto emu = CpuX86(Mode.MODE_32);
         emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
         emu.memWrite(0x1000, instructions);
 
-        auto hook = emu.addCodeHook(HookType.CODE, 0x1000, 0x2000, callback);
+        auto hook = emu.addCodeHook(HookType.CODE, 0x1000, 0x2000,
+                                    (Unicorn* unicorn, ulong address, uint size) {
+                                        assert(address == 0x1000);
+                                        assert(size == 1);
+                                    });
         emu.emuStart(0x1000, 0x1001, 10 * SECOND_SCALE, 1000);
         emu.removeHook(hook);
     }
 
     // intr callback
     {
-        auto callback = function(Unicorn* unicorn, uint intno)
-            {
-                assert(intno == 0x80);
-            };
-
         ubyte[] instructions = [0xcd, 0x80]; // INT 0x80;
 
         auto emu = CpuX86(Mode.MODE_32);
         emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
         emu.memWrite(0x1000UL, instructions);
 
-        auto hook = emu.addIntrHook(callback);
+        auto hook = emu.addIntrHook((Unicorn* unicorn, uint intno) {
+                assert(intno == 0x80);
+            });
         emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
         emu.removeHook(hook);
     }
 
     // mem callback
     {
-        auto callback = function(Unicorn* unicorn, MemType memType, ulong address,
-                                 size_t size, long value)
-            {
-                assert(memType == MemType.WRITE);
-                assert(address == 0x2000);
-                assert(size == 4);
-                assert(value == 0xdeadbeef);
-                return false;
-            };
-
         // mov eax, 0xdeadbeef;
         // mov [0x2000], eax;
         ubyte[] instructions = [0xB8, 0xEF, 0xBE, 0xAD, 0xDE, 0xA3, 0x00, 0x20, 0x00, 0x00];
@@ -465,7 +450,14 @@ unittest
         emu.memWrite(0x1000UL, instructions);
 
         auto hook = emu.addMemHook(cast(HookType)MemHookType.MEM_ALL, 0UL, ulong.max,
-                                   callback);
+                                   (Unicorn* unicorn, MemType memType, ulong address,
+                                    size_t size, long value) {
+                                       assert(memType == MemType.WRITE);
+                                       assert(address == 0x2000);
+                                       assert(size == 4);
+                                       assert(value == 0xdeadbeef);
+                                       return false;
+                                   });
         emu.regWrite(RegisterX86.EAX, 0x123);
         emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 0x1000);
         emu.removeHook(hook);
@@ -473,52 +465,40 @@ unittest
 
     // insn in callback
     {
-        auto callback = function(Unicorn* unicorn, uint port, size_t size)
-            {
-                assert(port == 0x10);
-                assert(size == 4);
-                return 0U;
-            };
-
         ubyte[] instructions = [0xe5, 0x10]; // IN eax, 0x10;
 
         auto emu = CpuX86(Mode.MODE_32);
         emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
         emu.memWrite(0x1000UL, instructions);
 
-        auto hook = emu.addInsnInHook(callback);
+        auto hook = emu.addInsnInHook((Unicorn* unicorn, uint port, size_t size) {
+                assert(port == 0x10);
+                assert(size == 4);
+                return 0U;
+            });
         emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
         emu.removeHook(hook);
     }
 
     // insn out callback
     {
-        auto callback = function(Unicorn* unicorn, uint port, size_t size, uint value)
-            {
-                assert(port == 0x46);
-                assert(size == 1);
-                assert(value == 0x32);
-            };
-
         ubyte[] instructions = [0xb0, 0x32, 0xe6, 0x46]; // MOV al, 0x32; OUT  0x46, al;
 
         auto emu = CpuX86(Mode.MODE_32);
         emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
         emu.memWrite(0x1000UL, instructions);
 
-        auto hook = emu.addInsnOutHook(callback);
+        auto hook = emu.addInsnOutHook((Unicorn* unicorn, uint port, size_t size, uint value) {
+                assert(port == 0x46);
+                assert(size == 1);
+                assert(value == 0x32);
+            });
         emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
         emu.removeHook(hook);
     }
 
     // insn sys callback
     {
-        auto callback = function(Unicorn* unicorn)
-            {
-                auto rax = unicorn.regRead(RegisterX86.RAX);
-                assert(rax == 0xdeadbeef);
-            };
-
         // MOV rax, 0xdeadbeef; SYSCALL;
         ubyte[] instructions = [0x48, 0xB8, 0xEF, 0xBE, 0xAD, 0xDE, 0x00, 0x00, 0x00, 0x00, 0x0F,
                                 0x05];
@@ -527,7 +507,10 @@ unittest
         emu.memMap(0x1000, 0x4000, Protection.PROT_ALL);
         emu.memWrite(0x1000UL, instructions);
 
-        auto hook = emu.addInsnSysHook(InsnX86.SYSCALL, 1, 0, callback);
+        auto hook = emu.addInsnSysHook(InsnX86.SYSCALL, 1, 0, (Unicorn* unicorn) {
+                auto rax = unicorn.regRead(RegisterX86.RAX);
+                assert(rax == 0xdeadbeef);
+            });
         emu.emuStart(0x1000, 0x1000 + instructions.length, 10 * SECOND_SCALE, 1000);
         emu.removeHook(hook);
     }
