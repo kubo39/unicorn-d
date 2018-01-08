@@ -266,7 +266,7 @@ struct Unicorn
 }
 
 
-template CpuImpl(Arch arch)
+template CpuImpl(Arch arch, R)
 {
     Unicorn* emu;
 
@@ -275,12 +275,12 @@ template CpuImpl(Arch arch)
         emu = new Unicorn(arch, mode);
     }
 
-    void regWrite(int regid, ulong value)
+    void regWrite(R regid, ulong value)
     {
         this.emu.regWrite(regid, value);
     }
 
-    ulong regRead(int regid)
+    ulong regRead(R regid)
     {
         return this.emu.regRead(regid);
     }
@@ -355,32 +355,38 @@ template CpuImpl(Arch arch)
 
 struct CpuARM
 {
-    mixin CpuImpl!(Arch.ARM);
+    import unicorn.constants.arm;
+    mixin CpuImpl!(Arch.ARM, RegisterARM);
 }
 
 struct CpuARM64
 {
-    mixin CpuImpl!(Arch.ARM64);
+    import unicorn.constants.arm64;
+    mixin CpuImpl!(Arch.ARM64, RegisterARM64);
 }
 
 struct CpuM68K
 {
-    mixin CpuImpl!(Arch.M68K);
+    import unicorn.constants.m68k;
+    mixin CpuImpl!(Arch.M68K, RegisterM68K);
 }
 
 struct CpuMIPS
 {
-    mixin CpuImpl!(Arch.MIPS);
+    import unicorn.constants.mips;
+    mixin CpuImpl!(Arch.MIPS, RegisterMIPS);
 }
 
 struct CpuSPARC
 {
-    mixin CpuImpl!(Arch.SPARC);
+    import unicorn.constants.sparc;
+    mixin CpuImpl!(Arch.SPARC, RegisterSPARC);
 }
 
 struct CpuX86
 {
-    mixin CpuImpl!(Arch.X86);
+    import unicorn.constants.x86;
+    mixin CpuImpl!(Arch.X86, RegisterX86);
 
     uc_hook addInsnInHook(uint function(Unicorn*, uint, size_t) callback)
     {
