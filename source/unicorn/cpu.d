@@ -95,11 +95,40 @@ struct Unicorn
         uc_close(engine);
     }
 
+    void regWriteMsr(X86MSR msr, ulong value)
+    {
+        auto reg = x86msr(msr, value);
+        auto status = uc_reg_write(this.engine, msr, cast(const void*)&reg);
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
+    }
+
+    void regWriteMmr(X86MMR msr, x86mmr value)
+    {
+        auto status = uc_reg_write(this.engine, msr, cast(const void*)&value);
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
+    }
+
     // Write to register.
     void regWrite(int regid, ulong value)
     {
         auto status = uc_reg_write(this.engine, regid, cast(const void*)&value);
         enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
+    }
+
+    ulong regReadMsr(X86MSR msr)
+    {
+        auto reg = x86msr(msr, 0);
+        auto status = uc_reg_read(this.engine, msr, cast(void*)&reg);
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
+        return reg.value;
+    }
+
+    x86mmr regReadMmr(X86MMR mmr)
+    {
+        auto value = x86mmr(0, 0, 0, 0);
+        auto status = uc_reg_read(this.engine, mmr, cast(void*)&value);
+        enforce!UnicornError(status == Status.OK, format("Error: %s", uc_strerror(status).fromStringz));
+        return value;
     }
 
     // Read register value.
@@ -387,6 +416,26 @@ struct CpuX86
 {
     import unicorn.constants.x86;
     mixin CpuImpl!(Arch.X86, RegisterX86);
+
+    void regWriteMsr(X86MSR msr, ulong value)
+    {
+        this.emu.regWriteMsr(msr, value);
+    }
+
+    void regWriteMmr(X86MMR mmr, x86mmr value)
+    {
+        this.emu.regWriteMmr(mmr, value);
+    }
+
+    ulong regReadMsr(X86MSR msr)
+    {
+        return this.emu.regReadMsr(msr);
+    }
+
+    x86mmr regReadMmr(X86MMR mmr)
+    {
+        return this.emu.regReadMmr(mmr);
+    }
 
     uc_hook addInsnInHook(uint function(Unicorn*, uint, size_t) callback)
     {

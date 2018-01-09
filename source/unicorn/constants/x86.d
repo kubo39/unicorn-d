@@ -1,5 +1,19 @@
 module unicorn.constants.x86;
 
+struct x86mmr
+{
+    ushort selector;
+    ulong base;
+    uint limit;
+    uint flags;
+}
+
+struct x86msr
+{
+    uint msr;
+    ulong value;
+}
+
 enum RegisterX86
 {
     INVALID = 0,
@@ -244,6 +258,18 @@ enum RegisterX86
     R13W,
     R14W,
     R15W,
+
+    // mmr registers.
+    IDTR,
+    GDTR,
+    LDTR,
+    TR,
+
+    //
+    FPCW,
+    FPTAG,
+
+    MSR, // Model-Specific Register
 }
 
 enum InsnX86
@@ -252,4 +278,17 @@ enum InsnX86
     OUT = 500,
     SYSCALL = 699,
     SYSENTER = 700,
+}
+
+enum X86MSR
+{
+    FS = 0xC0000100,
+    GS = 0xC0000101,
+}
+
+enum X86MMR
+{
+    IDTR = 242,
+    GDTR = 243,
+    LDTR = 244,
 }
